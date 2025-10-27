@@ -5,14 +5,23 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 
-def main(predict_impressions: float | None = None):
-    df = pd.read_csv("students/03/data/20_website_visits.csv")
+FEATURE = "advertising_impressions"
+TARGET = "website_visits"
 
-    X = df[["advertising_impressions"]]  
-    y = df["website_visits"]             
 
-    model = LinearRegression()
-    model.fit(X, y)
+def main(predict_impressions=None, csv_path=None, save_plot=False):
+    csv_path = csv_path or "students/03/data/20_website_visits.csv"
+    df = pd.read_csv(csv_path)
+
+    for col in (FEATURE, TARGET):
+        if col not in df.columns:
+            raise ValueError(f"Nedostaje stupac: {col}")
+    df = df[[FEATURE, TARGET]].dropna()
+
+    X = df[[FEATURE]] 
+    y = df[TARGET]
+
+    model = LinearRegression().fit(X, y)
 
     y_hat = model.predict(X)
     r2 = r2_score(y, y_hat)
@@ -20,25 +29,37 @@ def main(predict_impressions: float | None = None):
     print("Koeficijent (slope):", float(model.coef_[0]))
     print("Presjek (intercept):", float(model.intercept_))
     print("R^2:", round(r2, 4))
+    print(f"Model:{TARGET}={model.coef_[0]:.6f}*{FEATURE}+{model.intercept_:.6f}")
 
-    plt.scatter(X, y, label="Podaci")
-    x_line = np.linspace(X.min()[0], X.max()[0], 100).reshape(-1, 1)
+    plt.scatter(X[FEATURE], y, label="Podaci")
+
+    x_min = X[FEATURE].min()
+    x_max = X[FEATURE].max()
+    x_line = pd.DataFrame({FEATURE: np.linspace(x_min, x_max, 100)})
     y_line = model.predict(x_line)
-    plt.plot(x_line, y_line, label="Linearni model")
+    plt.plot(x_line[FEATURE], y_line, label="Linearni model")
+
     plt.xlabel("Advertising impressions")
     plt.ylabel("Website visits")
     plt.title("Website visits ~ Advertising impressions")
     plt.legend()
     plt.tight_layout()
-    plt.show()
+
+    if save_plot:
+        plt.savefig("regression_plot.png", dpi=150)
+        print("Graf spremljen u: regression_plot.png")
+    else:
+        plt.show()
 
     if predict_impressions is not None:
-        pred = model.predict(np.array([[float(predict_impressions)]]))[0]
+        X_new = pd.DataFrame({FEATURE: [float(predict_impressions)]})
+        pred = model.predict(X_new)[0]
         print(f"Predviđen broj posjeta za {predict_impressions:.0f} impresija: {pred:.2f}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--predict", type=float, default=None,
-                        help="Ako proslijediš broj impresija (npr. --predict 10000), ispisat ću predviđene posjete.")
+    parser.add_argument("--predict", type=float, default=None)
+    parser.add_argument("--csv", type=str, default=None)
+    parser.add_argument("--save-plot", action="store_true")
     args = parser.parse_args()
-    main(args.predict)
+    main(args.predict, args.csv, args.save_plot)
